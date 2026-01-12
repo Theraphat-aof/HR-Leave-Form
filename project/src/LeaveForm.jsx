@@ -342,7 +342,7 @@ const LeaveForm = ({ session, lang }) => {
                     {/* Main Content */}
                     <div className="col-md-9">
                         <div className="mb-4">
-                            <h4 className="mb-3">{texts[lang].summaryTitle}: <span className="text-primary fw-bold">{currentEmployee.name || <span className="text-danger">({texts[lang].noEmpSelected})</span>}</span></h4>
+                            <h4 className="mb-3">{texts[lang].summaryTitle}: <span className="text-dark fw-bold">{currentEmployee.name || <span className="text-danger">({texts[lang].noEmpSelected})</span>}</span></h4>
                             <div className="row g-3">
                                 {/* Stats Cards */}
                                 <div className="col-md-3">

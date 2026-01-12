@@ -62,6 +62,13 @@
   font-weight: bold;
 }
 
+.dropdown-item:active, 
+.dropdown-item:focus,
+.dropdown-item.active {
+    background-color: #d63384 !important; /* บังคับให้เป็นสีชมพูเสมอ */
+    color: white !important;
+}
+
 /* --- Loading Animation (Uiverse.io by mobinkakei) --- */
 .loader-wrapper {
   width: 200px;

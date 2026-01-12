@@ -212,7 +212,6 @@ const Navbar = ({ session, currentPage, setPage, lang, setLang }) => {
                                 <li>
                                     <button
                                         className={`dropdown-item d-flex align-items-center ${currentPage === 'calendar' ? 'active' : ''}`}
-                                        style={currentPage === 'calendar' ? { backgroundColor: '#d63384', color: 'white' } : {}}
                                         onClick={() => { setPage('calendar'); setIsDropdownOpen(false); setIsNavExpanded(false); }}
                                     >
                                         <i className="bi bi-calendar-date me-2"></i>
@@ -223,7 +222,6 @@ const Navbar = ({ session, currentPage, setPage, lang, setLang }) => {
                                 <li>
                                     <button
                                         className={`dropdown-item d-flex align-items-center ${currentPage === 'attendance' ? 'active' : ''}`}
-                                        style={currentPage === 'attendance' ? { backgroundColor: '#d63384', color: 'white' } : {}}
                                         onClick={() => { setPage('attendance'); setIsDropdownOpen(false); setIsNavExpanded(false); }}
                                     >
                                         <i className="bi bi-table me-2"></i>
