@@ -1,4 +1,5 @@
-import LeaveForm from "./Components/Leave-Form";
+import './App.css';
+import LeaveForm from './LeaveForm';
 
 function App() {
   return (
