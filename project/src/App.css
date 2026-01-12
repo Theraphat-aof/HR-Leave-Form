@@ -1,48 +1,39 @@
-/* --- App.css --- */
-
-/* 1. สไตล์สำหรับรายการพนักงาน */
 .user-list-item {
   cursor: pointer;
   transition: all 0.2s;
 }
 
-/* สถานะ Active (ถูกเลือก) */
 .user-list-item.active {
-  background-color: #0d6efd; /* สี Primary ของ Bootstrap */
+  background-color: #0d6efd;
   color: white;
   cursor: default;
   border-color: #0d6efd;
 }
 
-/* 2. สไตล์ปุ่ม Action (ดินสอ/ถังขยะ) */
 .action-btn {
   cursor: pointer;
   opacity: 0.8;
   transition: all 0.2s;
-  font-size: 1.1rem; /* ปรับขนาดนิดหน่อยให้กดง่าย */
+  font-size: 1.1rem;
 }
 
 .action-btn:hover {
   opacity: 1;
-  transform: scale(1.1); /* เพิ่มลูกเล่นขยายตอนเอาเมาส์ชี้ */
+  transform: scale(1.1);
 }
 
-/* กำหนดสีไอคอนตามสถานะของแถว (Parent) */
-/* ถ้าแถว Active ให้ไอคอนเป็นสีขาว */
 .user-list-item.active .action-btn {
   color: white !important;
 }
 
-/* ถ้าแถวปกติ ให้กำหนดสีแยกตามประเภท */
 .user-list-item:not(.active) .action-btn-edit {
   color: orange;
 }
 
 .user-list-item:not(.active) .action-btn-delete {
-  color: #dc3545; /* สีแดง Bootstrap */
+  color: #dc3545;
 }
 
-/* 3. สไตล์สำหรับวันหยุดในปฏิทิน */
 .holiday-tile {
   background-color: #fff0f0 !important;
   color: #d63384;

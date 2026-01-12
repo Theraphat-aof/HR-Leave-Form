@@ -206,7 +206,7 @@ const LeaveForm = () => {
 
     return (
         <div className="bg-light min-vh-100 font-sans">
-            
+
             {/* Navbar */}
             <nav className="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm px-4 sticky-top">
                 <a className="navbar-brand fw-bold" href="#">
@@ -221,7 +221,7 @@ const LeaveForm = () => {
 
             <div className="container-fluid py-4">
                 <div className="row">
-                    
+
                     {/* Sidebar */}
                     <div className="col-md-3 mb-3">
                         <div className="card shadow-sm border-0 h-100">
@@ -230,19 +230,16 @@ const LeaveForm = () => {
                                 <div className="mb-3">
                                     <input type="text" className="form-control" placeholder={texts[lang].searchPlaceholder} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                                 </div>
-                                
-                                {/* User List: ใช้ ClassName แทน inline style */}
+
                                 <div className="list-group list-group-flush border rounded overflow-auto mb-3 flex-grow-1" style={{ maxHeight: '400px' }}>
                                     {filteredEmployees.map(emp => (
-                                        <div 
-                                            key={emp.id} 
-                                            onClick={() => setSelectedEmpId(emp.id)} 
-                                            // ใช้ Logic เลือก Class ตาม State
+                                        <div
+                                            key={emp.id}
+                                            onClick={() => setSelectedEmpId(emp.id)}
                                             className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center user-list-item ${selectedEmpId === emp.id ? 'active' : ''}`}
                                         >
                                             <span className="text-truncate" style={{ maxWidth: '120px' }}>{emp.name}</span>
                                             <div className="d-flex align-items-center gap-2">
-                                                {/* ใช้ Class แยกประเภทปุ่มเพื่อให้ CSS จัดการสี */}
                                                 <i className="bi bi-pencil-square action-btn action-btn-edit" onClick={(e) => handleEditEmployee(emp.id, emp.name, e)}></i>
                                                 <i className="bi bi-trash action-btn action-btn-delete" onClick={(e) => handleDeleteEmployee(emp.id, e)}></i>
                                             </div>
