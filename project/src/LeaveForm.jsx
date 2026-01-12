@@ -21,7 +21,7 @@ const LeaveForm = () => {
 
     // --- Configuration ---
     const texts = {
-        TH: { appTitle: "ระบบบันทึกวันลา (Online)", empListTitle: "รายชื่อพนักงาน", searchPlaceholder: "ค้นหาชื่อ...", addEmpPlaceholder: "ชื่อพนักงานใหม่...", addBtn: "เพิ่ม", exportMonthBtn: "Excel (เดือนนี้)", exportAllBtn: "Excel (ทั้งหมด)", summaryTitle: "สรุปวันลาของ", monthUsage: "เดือนนี้", yearUsage: "ปีนี้", selectType: "เลือกประเภท", noEmpSelected: "กรุณาเลือกพนักงาน", types: { personal: "ลากิจ", sick: "ลาป่วย", vacation: "พักร้อน", maternity: "ลาคลอด", absent: "ขาดงาน", late: "มาสาย", halfDay: "ลาครึ่งวัน" } },
+        TH: { appTitle: "ระบบบันทึกวันลา (Online)", empListTitle: "รายชื่อพนักงาน", searchPlaceholder: "ค้นหาชื่อ...", addEmpPlaceholder: "ชื่อพนักงานใหม่...", addBtn: "เพิ่ม", exportMonthBtn: "Excel (เดือนนี้)", exportAllBtn: "Excel (ปีนี้)", summaryTitle: "สรุปวันลาของ", monthUsage: "เดือนนี้", yearUsage: "ปีนี้", selectType: "เลือกประเภท", noEmpSelected: "กรุณาเลือกพนักงาน", types: { personal: "ลากิจ", sick: "ลาป่วย", vacation: "พักร้อน", maternity: "ลาคลอด", absent: "ขาดงาน", late: "มาสาย", halfDay: "ลาครึ่งวัน" } },
         CN: { appTitle: "休假管理系统 (Online)", empListTitle: "员工列表", searchPlaceholder: "搜索姓名...", addEmpPlaceholder: "新员工姓名...", addBtn: "添加", exportMonthBtn: "Excel (本月)", exportAllBtn: "Excel (全部)", summaryTitle: "休假摘要", monthUsage: "本月", yearUsage: "本年", selectType: "选择类型", noEmpSelected: "请选择员工", types: { personal: "事假", sick: "病假", vacation: "年假", maternity: "产假", absent: "旷工", late: "迟到", halfDay: "半天假" } }
     };
     const leaveTypes = [
@@ -187,18 +187,36 @@ const LeaveForm = () => {
         };
     }, [leaveRecords, selectedDate, selectedEmpId]);
 
-    const exportDataToExcel = (data, fileName) => {
-        if (data.length === 0) { alert("ไม่มีข้อมูล"); return; }
-        const formattedData = data.map(r => ({
-            Date: r.date,
-            Employee: employees.find(e => e.id === r.empId)?.name || 'Unknown',
-            Type: texts[lang].types[r.type],
-            Days: r.days || 1,
-            Note: thaiHolidays[r.date] ? `ตรงวันหยุด: ${thaiHolidays[r.date]}` : ''
-        }));
-        const ws = XLSX.utils.json_to_sheet(formattedData);
+    // --- New Export Function: สรุปรายชื่อพนักงานทุกคน ---
+    const exportSummaryToExcel = (targetRecords, fileName) => {
+        if (employees.length === 0) { alert("ไม่มีข้อมูลพนักงาน"); return; }
+
+        const data = employees.map(emp => {
+            const empRecords = targetRecords.filter(r => r.empId === emp.id);
+
+            const totalDays = empRecords.reduce((sum, r) => sum + (Number(r.days) || 1), 0);
+
+            const details = empRecords
+                .sort((a, b) => new Date(a.date) - new Date(b.date)) 
+                .map(r => {
+                    const typeLabel = texts[lang].types[r.type] || r.type;
+                    const isHoliday = thaiHolidays[r.date] ? ` [${thaiHolidays[r.date]}]` : '';
+                    return `${r.date} (${typeLabel}${isHoliday})`;
+                })
+                .join(', ');
+
+            // 5. คืนค่าเป็น Object สำหรับ Excel Row
+            return {
+                "รหัส (ID)": emp.id,
+                "ชื่อพนักงาน (Name)": emp.name,
+                "รวมวันลา (Total Days)": totalDays,
+                "รายละเอียดการลา (Details)": details || "-" 
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Leaves");
+        XLSX.utils.book_append_sheet(wb, ws, "Summary");
         XLSX.writeFile(wb, fileName);
     };
 
@@ -208,7 +226,7 @@ const LeaveForm = () => {
         <div className="bg-light min-vh-100 font-sans">
 
             {/* Navbar */}
-            <nav className="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm px-4 sticky-top">
+            <nav className="navbar navbar-expand-lg navbar-dark shadow-sm px-4 sticky-top">
                 <a className="navbar-brand fw-bold" href="#">
                     <i className="bi bi-calendar-check me-2"></i> {texts[lang].appTitle}
                 </a>
@@ -249,7 +267,7 @@ const LeaveForm = () => {
 
                                 <form onSubmit={handleAddEmployee} className="input-group">
                                     <input type="text" className="form-control" placeholder={texts[lang].addEmpPlaceholder} value={newEmpName} onChange={(e) => setNewEmpName(e.target.value)} />
-                                    <button className="btn btn-primary" type="submit"><i className="bi bi-plus-lg"></i></button>
+                                    <button className="btn-addname btn" type="submit"><i className="bi bi-plus-lg"></i></button>
                                 </form>
                             </div>
                         </div>
@@ -258,7 +276,7 @@ const LeaveForm = () => {
                     {/* Main Content */}
                     <div className="col-md-9">
                         <div className="mb-4">
-                            <h4 className="mb-3">{texts[lang].summaryTitle}: <span className="text-primary fw-bold">{currentEmployee.name || <span className="text-danger">({texts[lang].noEmpSelected})</span>}</span></h4>
+                            <h4 className="mb-3">{texts[lang].summaryTitle}: <span className="text-dark fw-bold">{currentEmployee.name || <span className="text-danger">({texts[lang].noEmpSelected})</span>}</span></h4>
                             <div className="row g-3">
                                 <div className="col-md-3">
                                     <div className="card border-0 shadow-sm p-3 h-100 d-flex flex-column justify-content-center">
@@ -273,18 +291,46 @@ const LeaveForm = () => {
                                     </div>
                                 </div>
                                 <div className="col-md-3">
-                                    <button onClick={() => {
-                                        const m = selectedDate.getMonth();
-                                        const y = selectedDate.getFullYear();
-                                        const name = selectedDate.toLocaleString('default', { month: 'long' });
-                                        exportDataToExcel(leaveRecords.filter(r => { const d = new Date(r.date); return d.getMonth() === m && d.getFullYear() === y; }), `Monthly_${name}_${y}.xlsx`);
-                                    }} className="btn btn-outline-primary shadow-sm w-100 h-100 d-flex align-items-center justify-content-center fw-bold">
-                                        <div className="text-center"><i className="bi bi-file-earmark-excel d-block fs-4"></i>{texts[lang].exportMonthBtn}</div>
+                                    <button
+                                        onClick={() => {
+                                            const m = selectedDate.getMonth();
+                                            const y = selectedDate.getFullYear();
+                                            const monthName = selectedDate.toLocaleString('default', { month: 'long' }); // ชื่อเดือนภาษาไทย/อังกฤษ
+
+                                            const monthlyData = leaveRecords.filter(r => {
+                                                const d = new Date(r.date);
+                                                return d.getMonth() === m && d.getFullYear() === y;
+                                            });
+
+                                            exportSummaryToExcel(monthlyData, `Summary_Monthly_${monthName}_${y}.xlsx`);
+                                        }}
+                                        className="btn btn-outline-primary shadow-sm w-100 h-100 d-flex align-items-center justify-content-center fw-bold"
+                                    >
+                                        <div className="text-center">
+                                            <i className="bi bi-file-earmark-excel d-block fs-4"></i>
+                                            {texts[lang].exportMonthBtn}
+                                        </div>
                                     </button>
                                 </div>
+
                                 <div className="col-md-3">
-                                    <button onClick={() => exportDataToExcel(leaveRecords, "All_Leaves.xlsx")} className="btn btn-success shadow-sm w-100 h-100 d-flex align-items-center justify-content-center fw-bold">
-                                        <div className="text-center"><i className="bi bi-file-earmark-spreadsheet d-block fs-4"></i>{texts[lang].exportAllBtn}</div>
+                                    <button
+                                        onClick={() => {
+                                            const y = selectedDate.getFullYear();
+
+                                            const yearlyData = leaveRecords.filter(r => {
+                                                const d = new Date(r.date);
+                                                return d.getFullYear() === y;
+                                            });
+
+                                            exportSummaryToExcel(yearlyData, `Summary_Year_${y}.xlsx`);
+                                        }}
+                                        className="btn btn-success shadow-sm w-100 h-100 d-flex align-items-center justify-content-center fw-bold"
+                                    >
+                                        <div className="text-center">
+                                            <i className="bi bi-file-earmark-spreadsheet d-block fs-4"></i>
+                                            {texts[lang].exportAllBtn}
+                                        </div>
                                     </button>
                                 </div>
                             </div>

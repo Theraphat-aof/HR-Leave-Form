@@ -1,13 +1,28 @@
+.navbar {
+  background-color: #d63384;
+}
+
 .user-list-item {
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .user-list-item.active {
-  background-color: #0d6efd;
+  background-color: #d63384;
   color: white;
   cursor: default;
-  border-color: #0d6efd;
+  border-color: #d63384;
+}
+
+.btn-addname {
+  background-color: #d63384;
+  color: white;
+  transition: all 0.2s;
+}
+
+.btn-addname:hover {
+  background-color: #c0266a;
+  color: white;
 }
 
 .action-btn {
