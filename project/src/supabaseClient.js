@@ -1,8 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 
-// 1. ไปที่ Supabase Dashboard -> Project Settings -> API
-// 2. Copy "Project URL" และ "anon public key" มาใส่ตรงนี้
-const supabaseUrl = 'https://wjabjvminwfgzhsfsryc.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqYWJqdm1pbndmZ3poc2ZzcnljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxNzkwNzgsImV4cCI6MjA4Mzc1NTA3OH0.-jngbpAg11qJej7KDxLFbs7MGHv698j-U3lHZFvPS-U'
+// Read Supabase config from Vite environment variables.
+// Create a `.env` or `.env.local` with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseKey)
+if (!supabaseUrl || !supabaseAnonKey) {
+	// Warn in development if env vars are missing — avoid exposing secrets in source.
+	// Do NOT commit real keys into the repository.
+	console.warn('Missing Supabase environment variables: VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
