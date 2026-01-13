@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import Swal from 'sweetalert2'; 
+import Swal from 'sweetalert2';
 
 const Navbar = ({ session, currentPage, setPage, lang, setLang }) => {
     const [isNavExpanded, setIsNavExpanded] = useState(false);
@@ -122,7 +122,7 @@ const Navbar = ({ session, currentPage, setPage, lang, setLang }) => {
             inputPlaceholder: t.pwdPlaceholder,
             showCancelButton: true,
             confirmButtonText: 'Update',
-            confirmButtonColor: '#ffc107', 
+            confirmButtonColor: '#ffc107',
             cancelButtonText: t.cancelBtn,
             inputAttributes: {
                 minlength: 6,
@@ -161,14 +161,19 @@ const Navbar = ({ session, currentPage, setPage, lang, setLang }) => {
             text: t.logoutConfirm,
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#dc3545', 
+            confirmButtonColor: '#dc3545',
             cancelButtonColor: '#6c757d',
             confirmButtonText: t.confirmBtn,
             cancelButtonText: t.cancelBtn
         }).then(async (result) => {
             if (result.isConfirmed) {
-                await supabase.auth.signOut();
-                window.location.reload();
+                const { error } = await supabase.auth.signOut();
+
+                if (error) {
+                    console.error('Logout Error:', error);
+                }
+                localStorage.clear();
+                window.location.href = '/';
             }
         });
     };

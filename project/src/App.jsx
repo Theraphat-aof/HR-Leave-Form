@@ -4,7 +4,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
 // Import Components
-import Navbar from './Navbar'; 
+import Navbar from './Navbar';
 import LeaveForm from './LeaveForm';
 import Auth from './Auth';
 import OrgSetup from './OrgSetup';
@@ -15,8 +15,8 @@ function App() {
   const [hasOrg, setHasOrg] = useState(false);
   const [checkingOrg, setCheckingOrg] = useState(true);
 
-  const [currentPage, setCurrentPage] = useState('calendar'); 
-  const [lang, setLang] = useState('TH'); 
+  const [currentPage, setCurrentPage] = useState('calendar');
+  const [lang, setLang] = useState('TH');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -47,28 +47,28 @@ function App() {
   if (checkingOrg) return <div className="d-flex justify-content-center align-items-center min-vh-100 fw-bold text-primary"></div>;
 
   if (!session) return <Auth />;
-  
+
   if (!hasOrg) return <OrgSetup session={session} onOrgSet={() => setHasOrg(true)} />;
 
   // --- Main App UI ---
   return (
     <div className="bg-light min-vh-100 d-flex flex-column">
-        
-        <Navbar 
-            session={session} 
-            currentPage={currentPage} 
-            setPage={setCurrentPage} 
-            lang={lang} 
-            setLang={setLang} 
-        />
 
-        <div className="flex-grow-1">
-            {currentPage === 'calendar' ? (
-                <LeaveForm session={session} lang={lang} /> 
-            ) : (
-                <AttendanceSheet session={session} lang={lang} />
-            )}
-        </div>
+      <Navbar
+        session={session}
+        currentPage={currentPage}
+        setPage={setCurrentPage}
+        lang={lang}
+        setLang={setLang}
+      />
+
+      <div className="flex-grow-1">
+        {currentPage === 'calendar' ? (
+          <LeaveForm session={session} lang={lang} />
+        ) : (
+          <AttendanceSheet session={session} lang={lang} />
+        )}
+      </div>
     </div>
   );
 }
