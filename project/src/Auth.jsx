@@ -6,6 +6,7 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState(''); // ✅ 1. เพิ่ม State
   const [view, setView] = useState('login'); 
   const [lang, setLang] = useState('TH');
 
@@ -16,6 +17,7 @@ export default function Auth() {
       recoveryTitle: 'ลืมรหัสผ่าน',
       emailLabel: 'อีเมล',
       passwordLabel: 'รหัสผ่าน',
+      confirmPasswordLabel: 'ยืนยันรหัสผ่าน', // ✅ เพิ่มคำแปล
       forgotPasswordLink: 'ลืมรหัสผ่าน?',
       loginBtn: 'เข้าสู่ระบบ',
       registerBtn: 'สมัครสมาชิก',
@@ -25,7 +27,8 @@ export default function Auth() {
       hasAccount: 'มีบัญชีแล้ว? เข้าสู่ระบบ',
       backToLogin: 'กลับไปหน้าเข้าสู่ระบบ',
       alertRegisterSuccess: 'สมัครสมาชิกสำเร็จ! กรุณาตรวจสอบอีเมลเพื่อยืนยันตัวตน',
-      alertRecoverySent: 'ส่งลิงก์รีเซ็ตไปที่อีเมลแล้ว! กรุณาตรวจสอบ Inbox/Junk'
+      alertRecoverySent: 'ส่งลิงก์รีเซ็ตไปที่อีเมลแล้ว! กรุณาตรวจสอบ Inbox/Junk',
+      alertPasswordMismatch: 'รหัสผ่านไม่ตรงกัน กรุณาลองใหม่อีกครั้ง' // ✅ เพิ่มคำแปล Error
     },
     EN: {
       loginTitle: 'Login',
@@ -33,6 +36,7 @@ export default function Auth() {
       recoveryTitle: 'Reset Password',
       emailLabel: 'Email',
       passwordLabel: 'Password',
+      confirmPasswordLabel: 'Confirm Password',
       forgotPasswordLink: 'Forgot Password?',
       loginBtn: 'Login',
       registerBtn: 'Sign Up',
@@ -42,7 +46,8 @@ export default function Auth() {
       hasAccount: 'Already have an account? Login',
       backToLogin: 'Back to Login',
       alertRegisterSuccess: 'Registration successful! Please check your email for confirmation.',
-      alertRecoverySent: 'Reset link sent! Please check your Inbox/Junk.'
+      alertRecoverySent: 'Reset link sent! Please check your Inbox/Junk.',
+      alertPasswordMismatch: 'Passwords do not match. Please try again.'
     },
     CN: {
       loginTitle: '登录',
@@ -50,6 +55,7 @@ export default function Auth() {
       recoveryTitle: '重置密码',
       emailLabel: '电子邮箱',
       passwordLabel: '密码',
+      confirmPasswordLabel: '确认密码',
       forgotPasswordLink: '忘记密码？',
       loginBtn: '登录',
       registerBtn: '注册',
@@ -59,7 +65,8 @@ export default function Auth() {
       hasAccount: '已有账号？ 立即登录',
       backToLogin: '返回登录',
       alertRegisterSuccess: '注册成功！ 请检查您的电子邮件进行确认。',
-      alertRecoverySent: '重置链接已发送！ 请检查您的收件箱/垃圾邮件。'
+      alertRecoverySent: '重置链接已发送！ 请检查您的收件箱/垃圾邮件。',
+      alertPasswordMismatch: '密码不匹配，请重试。'
     }
   };
 
@@ -68,6 +75,18 @@ export default function Auth() {
   const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
+
+    // ✅ 2. ตรวจสอบรหัสผ่านก่อนแสดง Loading
+    if (view === 'register' && password !== confirmPassword) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Warning',
+            text: t.alertPasswordMismatch,
+            confirmButtonColor: '#ffc107'
+        });
+        setLoading(false);
+        return; // หยุดการทำงานทันที
+    }
 
     Swal.fire({
         title: t.processing,
@@ -85,13 +104,15 @@ export default function Auth() {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         
-        // ✅ แจ้งเตือนสมัครสำเร็จ
         Swal.fire({
             icon: 'success',
             title: t.registerTitle,
             text: t.alertRegisterSuccess,
             confirmButtonColor: '#0d6efd'
         });
+        // Reset password fields
+        setPassword('');
+        setConfirmPassword('');
       } 
       else if (view === 'recovery') {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -186,6 +207,21 @@ export default function Auth() {
                 className="form-control"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+            </div>
+          )}
+
+          {/* ✅ 3. Confirm Password (แสดงเฉพาะตอนสมัครสมาชิก) */}
+          {view === 'register' && (
+            <div className="mb-3">
+              <label className="form-label">{t.confirmPasswordLabel}</label>
+              <input
+                type="password"
+                className="form-control"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 minLength={6}
               />
