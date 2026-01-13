@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import * as XLSX from 'xlsx'; // ✅ Import xlsx
+import * as XLSX from 'xlsx';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 const AttendanceSheet = ({ session, lang }) => {
@@ -24,7 +24,7 @@ const AttendanceSheet = ({ session, lang }) => {
             summary: "สรุปยอดเดือนนี้ (วัน)",
             legendWork: "มาทำงาน (ติ๊กเอง)",
             legendHoliday: "วันหยุดนักขัตฤกษ์",
-            exportBtn: "ดาวน์โหลด Excel", // ✅ Text ใหม่
+            exportBtn: "ดาวน์โหลด Excel",
             col: {
                 present: { label: "เข้า", tooltip: "เข้างาน" },
                 absent: { label: "ขาด", tooltip: "ขาดงาน" },
@@ -74,7 +74,6 @@ const AttendanceSheet = ({ session, lang }) => {
     const t = texts[lang] || texts.TH;
 
     // --- Helper Functions ---
-    // ✅ แก้ไข: ใช้ Date Object ตรงๆ แล้ว format เอาเอง เพื่อแก้ Timezone
     const formatDateKey = (date) => {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -142,17 +141,13 @@ const AttendanceSheet = ({ session, lang }) => {
 
     const getCellData = (empId, date) => {
         const dateStr = formatDateKey(date);
-        // 1. เช็ควันลา (Leave) ก่อน
         const leaveRecord = leaves.find(l => l.emp_id === empId && l.date === dateStr);
         if (leaveRecord) return { type: 'leave', leaveType: leaveRecord.type };
 
-        // 2. เช็คการมาทำงาน (Attendance)
         const isPresent = attendanceLogs.some(a => a.emp_id === empId && a.date === dateStr);
 
-        // 3. เช็ควันหยุด (Holiday)
         if (holidays[dateStr]) return { type: 'holiday', isPresent, holidayName: holidays[dateStr] };
 
-        // 4. วันธรรมดา
         return { type: 'work', isPresent };
     };
 
@@ -172,14 +167,12 @@ const AttendanceSheet = ({ session, lang }) => {
         setCurrentDate(newDate);
     };
 
-    // ✅ ฟังก์ชัน Export Excel
+    // ฟังก์ชัน Export Excel
     const handleExportExcel = () => {
         const fileName = `Attendance_${formatDateKey(currentDate).substring(0, 7)}.xlsx`;
 
-        // เตรียมข้อมูล Header
         const header = [t.empName, t.col.present.label, t.col.absent.label, t.col.vacation.label, t.col.sick.label, t.col.personal.label, ...days.map(d => d.getDate())];
 
-        // เตรียมข้อมูล Rows
         const body = employees.map(emp => {
             const stats = calculateStats(emp.id);
             const dailyData = days.map(d => {

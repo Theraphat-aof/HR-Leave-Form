@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { supabase } from './supabaseClient';
-import Swal from 'sweetalert2'; 
+import Swal from 'sweetalert2';
 
 export default function OrgSetup({ session, onOrgSet }) {
-  const [mode, setMode] = useState('create'); 
+  const [mode, setMode] = useState('create');
   const [companyName, setCompanyName] = useState('');
   const [joinCode, setJoinCode] = useState('');
-  const [loading, setLoading] = useState(false); 
-  
+  const [loading, setLoading] = useState(false);
+
   const [lang, setLang] = useState('TH');
 
   const texts = {
@@ -72,12 +72,11 @@ export default function OrgSetup({ session, onOrgSet }) {
     e.preventDefault();
     setLoading(true);
 
-    // ✅ แสดง Loading Modal
     Swal.fire({
-        title: t.btnProcessing,
-        didOpen: () => Swal.showLoading(),
-        allowOutsideClick: false,
-        background: '#fff' 
+      title: t.btnProcessing,
+      didOpen: () => Swal.showLoading(),
+      allowOutsideClick: false,
+      background: '#fff'
     });
 
     try {
@@ -90,23 +89,22 @@ export default function OrgSetup({ session, onOrgSet }) {
           .from('organizations')
           .insert([{ name: companyName, join_code: code }])
           .select();
-        
+
         if (orgError) throw orgError;
         orgId = orgData[0].id;
-        
-        // ✅ Success Modal 
+
         await Swal.fire({
-            icon: 'success',
-            title: t.alertSuccessTitle,
-            html: `
+          icon: 'success',
+          title: t.alertSuccessTitle,
+          html: `
                 <p>${t.alertSuccessDesc}</p>
                 <div class="p-3 my-2 bg-light border rounded">
                     <h1 class="text-primary fw-bold m-0" style="letter-spacing: 2px;">${code}</h1>
                 </div>
                 <small class="text-muted">${t.alertSuccessHint}</small>
             `,
-            confirmButtonText: 'OK',
-            confirmButtonColor: '#0d6efd'
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#0d6efd'
         });
 
       } else {
@@ -115,11 +113,11 @@ export default function OrgSetup({ session, onOrgSet }) {
           .from('organizations')
           .select('id')
           .eq('join_code', joinCode)
-          .single(); 
+          .single();
 
         if (orgError || !orgData) throw new Error(t.alertNotFound);
         orgId = orgData.id;
-        
+
         Swal.close();
       }
 
@@ -134,10 +132,10 @@ export default function OrgSetup({ session, onOrgSet }) {
 
     } catch (error) {
       Swal.fire({
-          icon: 'error',
-          title: t.alertError,
-          text: error.message,
-          confirmButtonColor: '#dc3545'
+        icon: 'error',
+        title: t.alertError,
+        text: error.message,
+        confirmButtonColor: '#dc3545'
       });
     } finally {
       setLoading(false);
@@ -147,15 +145,15 @@ export default function OrgSetup({ session, onOrgSet }) {
   return (
     <div className="container d-flex justify-content-center align-items-center min-vh-100">
       <div className="card shadow p-4" style={{ maxWidth: '500px', width: '100%' }}>
-        
+
         <div className="d-flex justify-content-end mb-2 gap-1">
-            <button className={`btn btn-sm ${lang === 'TH' ? 'btn-dark' : 'btn-outline-secondary'}`} onClick={() => setLang('TH')}>TH</button>
-            <button className={`btn btn-sm ${lang === 'EN' ? 'btn-dark' : 'btn-outline-secondary'}`} onClick={() => setLang('EN')}>EN</button>
-            <button className={`btn btn-sm ${lang === 'CN' ? 'btn-dark' : 'btn-outline-secondary'}`} onClick={() => setLang('CN')}>CN</button>
+          <button className={`btn btn-sm ${lang === 'TH' ? 'btn-dark' : 'btn-outline-secondary'}`} onClick={() => setLang('TH')}>TH</button>
+          <button className={`btn btn-sm ${lang === 'EN' ? 'btn-dark' : 'btn-outline-secondary'}`} onClick={() => setLang('EN')}>EN</button>
+          <button className={`btn btn-sm ${lang === 'CN' ? 'btn-dark' : 'btn-outline-secondary'}`} onClick={() => setLang('CN')}>CN</button>
         </div>
 
         <h3 className="text-center mb-4">{t.header}</h3>
-        
+
         <div className="d-flex justify-content-center gap-3 mb-4">
           <button className={`btn ${mode === 'create' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setMode('create')}>
             {t.createTab}
@@ -169,25 +167,25 @@ export default function OrgSetup({ session, onOrgSet }) {
           {mode === 'create' ? (
             <div className="mb-3">
               <label className="form-label">{t.labelCompany}</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                value={companyName} 
-                onChange={e => setCompanyName(e.target.value)} 
-                required 
-                placeholder={t.placeholderCompany} 
+              <input
+                type="text"
+                className="form-control"
+                value={companyName}
+                onChange={e => setCompanyName(e.target.value)}
+                required
+                placeholder={t.placeholderCompany}
               />
             </div>
           ) : (
             <div className="mb-3">
               <label className="form-label">{t.labelCode}</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                value={joinCode} 
-                onChange={e => setJoinCode(e.target.value)} 
-                required 
-                placeholder={t.placeholderCode} 
+              <input
+                type="text"
+                className="form-control"
+                value={joinCode}
+                onChange={e => setJoinCode(e.target.value)}
+                required
+                placeholder={t.placeholderCode}
               />
             </div>
           )}

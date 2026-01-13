@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { supabase } from './supabaseClient';
-import Swal from 'sweetalert2'; 
+import Swal from 'sweetalert2';
 
 export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState(''); // ✅ 1. เพิ่ม State
-  const [view, setView] = useState('login'); 
+  const [view, setView] = useState('login');
   const [lang, setLang] = useState('TH');
 
   const texts = {
@@ -17,7 +17,7 @@ export default function Auth() {
       recoveryTitle: 'ลืมรหัสผ่าน',
       emailLabel: 'อีเมล',
       passwordLabel: 'รหัสผ่าน',
-      confirmPasswordLabel: 'ยืนยันรหัสผ่าน', // ✅ เพิ่มคำแปล
+      confirmPasswordLabel: 'ยืนยันรหัสผ่าน',
       forgotPasswordLink: 'ลืมรหัสผ่าน?',
       loginBtn: 'เข้าสู่ระบบ',
       registerBtn: 'สมัครสมาชิก',
@@ -28,7 +28,7 @@ export default function Auth() {
       backToLogin: 'กลับไปหน้าเข้าสู่ระบบ',
       alertRegisterSuccess: 'สมัครสมาชิกสำเร็จ! กรุณาตรวจสอบอีเมลเพื่อยืนยันตัวตน',
       alertRecoverySent: 'ส่งลิงก์รีเซ็ตไปที่อีเมลแล้ว! กรุณาตรวจสอบ Inbox/Junk',
-      alertPasswordMismatch: 'รหัสผ่านไม่ตรงกัน กรุณาลองใหม่อีกครั้ง' // ✅ เพิ่มคำแปล Error
+      alertPasswordMismatch: 'รหัสผ่านไม่ตรงกัน กรุณาลองใหม่อีกครั้ง'
     },
     EN: {
       loginTitle: 'Login',
@@ -76,44 +76,42 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
 
-    // ✅ 2. ตรวจสอบรหัสผ่านก่อนแสดง Loading
     if (view === 'register' && password !== confirmPassword) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Warning',
-            text: t.alertPasswordMismatch,
-            confirmButtonColor: '#ffc107'
-        });
-        setLoading(false);
-        return; // หยุดการทำงานทันที
+      Swal.fire({
+        icon: 'warning',
+        title: 'Warning',
+        text: t.alertPasswordMismatch,
+        confirmButtonColor: '#ffc107'
+      });
+      setLoading(false);
+      return;
     }
 
     Swal.fire({
-        title: t.processing,
-        didOpen: () => Swal.showLoading(),
-        allowOutsideClick: false
+      title: t.processing,
+      didOpen: () => Swal.showLoading(),
+      allowOutsideClick: false
     });
 
     try {
       if (view === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        Swal.close(); 
-      } 
+        Swal.close();
+      }
       else if (view === 'register') {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        
+
         Swal.fire({
-            icon: 'success',
-            title: t.registerTitle,
-            text: t.alertRegisterSuccess,
-            confirmButtonColor: '#0d6efd'
+          icon: 'success',
+          title: t.registerTitle,
+          text: t.alertRegisterSuccess,
+          confirmButtonColor: '#0d6efd'
         });
-        // Reset password fields
         setPassword('');
         setConfirmPassword('');
-      } 
+      }
       else if (view === 'recovery') {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: window.location.origin,
@@ -121,20 +119,20 @@ export default function Auth() {
         if (error) throw error;
 
         Swal.fire({
-            icon: 'info',
-            title: t.recoveryTitle,
-            text: t.alertRecoverySent,
-            confirmButtonColor: '#0d6efd'
+          icon: 'info',
+          title: t.recoveryTitle,
+          text: t.alertRecoverySent,
+          confirmButtonColor: '#0d6efd'
         }).then(() => {
-            setView('login'); 
+          setView('login');
         });
       }
     } catch (error) {
       Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: error.message,
-          confirmButtonColor: '#dc3545'
+        icon: 'error',
+        title: 'Error',
+        text: error.message,
+        confirmButtonColor: '#dc3545'
       });
     } finally {
       setLoading(false);
@@ -144,26 +142,26 @@ export default function Auth() {
   return (
     <div className="d-flex justify-content-center align-items-center min-vh-100 bg-light">
       <div className="card shadow p-4" style={{ maxWidth: '400px', width: '100%' }}>
-        
+
         <div className="d-flex justify-content-end mb-2 gap-1">
-            <button 
-                className={`btn btn-sm ${lang === 'TH' ? 'btn-primary' : 'btn-outline-secondary'}`} 
-                onClick={() => setLang('TH')}
-            >
-                TH
-            </button>
-            <button 
-                className={`btn btn-sm ${lang === 'EN' ? 'btn-primary' : 'btn-outline-secondary'}`} 
-                onClick={() => setLang('EN')}
-            >
-                EN
-            </button>
-            <button 
-                className={`btn btn-sm ${lang === 'CN' ? 'btn-primary' : 'btn-outline-secondary'}`} 
-                onClick={() => setLang('CN')}
-            >
-                CN
-            </button>
+          <button
+            className={`btn btn-sm ${lang === 'TH' ? 'btn-primary' : 'btn-outline-secondary'}`}
+            onClick={() => setLang('TH')}
+          >
+            TH
+          </button>
+          <button
+            className={`btn btn-sm ${lang === 'EN' ? 'btn-primary' : 'btn-outline-secondary'}`}
+            onClick={() => setLang('EN')}
+          >
+            EN
+          </button>
+          <button
+            className={`btn btn-sm ${lang === 'CN' ? 'btn-primary' : 'btn-outline-secondary'}`}
+            onClick={() => setLang('CN')}
+          >
+            CN
+          </button>
         </div>
 
         <h2 className="text-center mb-4 text-primary fw-bold">
@@ -192,10 +190,10 @@ export default function Auth() {
               <div className="d-flex justify-content-between">
                 <label className="form-label">{t.passwordLabel}</label>
                 {view === 'login' && (
-                  <span 
-                    role="button" 
-                    className="text-primary small" 
-                    style={{cursor: 'pointer'}}
+                  <span
+                    role="button"
+                    className="text-primary small"
+                    style={{ cursor: 'pointer' }}
                     onClick={() => setView('recovery')}
                   >
                     {t.forgotPasswordLink}
@@ -213,7 +211,7 @@ export default function Auth() {
             </div>
           )}
 
-          {/* ✅ 3. Confirm Password (แสดงเฉพาะตอนสมัครสมาชิก) */}
+          {/* Confirm Password */}
           {view === 'register' && (
             <div className="mb-3">
               <label className="form-label">{t.confirmPasswordLabel}</label>
@@ -229,8 +227,8 @@ export default function Auth() {
           )}
 
           <button type="submit" className="btn btn-primary w-100" disabled={loading}>
-            {view === 'login' ? t.loginBtn : 
-             view === 'register' ? t.registerBtn : t.sendLinkBtn}
+            {view === 'login' ? t.loginBtn :
+              view === 'register' ? t.registerBtn : t.sendLinkBtn}
           </button>
         </form>
 
@@ -250,7 +248,6 @@ export default function Auth() {
             </button>
           )}
         </div>
-
       </div>
     </div>
   );
