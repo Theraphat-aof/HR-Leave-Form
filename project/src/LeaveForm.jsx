@@ -248,7 +248,6 @@ const LeaveForm = ({ session, lang }) => {
             }).join(', ');
 
             return {
-                "รหัส": emp.id,
                 "ชื่อพนักงาน": emp.name,
                 "รวมวันลา": totalDays,
                 "รายละเอียด": details || "-"

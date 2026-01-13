@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
+import * as XLSX from 'xlsx'; // ✅ Import xlsx
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 const AttendanceSheet = ({ session, lang }) => {
@@ -10,15 +11,10 @@ const AttendanceSheet = ({ session, lang }) => {
     const [holidays, setHolidays] = useState({});
     const [isLoading, setIsLoading] = useState(false);
 
-    // --- Configuration: Texts & Colors ---
+    // --- Configuration ---
     const leaveColors = {
-        sick: '#dc3545',
-        personal: '#ffc107',
-        vacation: '#198754',
-        maternity: '#0d6efd',
-        absent: '#212529',
-        late: '#fd7e14',
-        halfDay: '#6f42c1'
+        sick: '#dc3545', personal: '#ffc107', vacation: '#198754',
+        maternity: '#0d6efd', absent: '#212529', late: '#fd7e14', halfDay: '#6f42c1'
     };
 
     const texts = {
@@ -28,6 +24,7 @@ const AttendanceSheet = ({ session, lang }) => {
             summary: "สรุปยอดเดือนนี้ (วัน)",
             legendWork: "มาทำงาน (ติ๊กเอง)",
             legendHoliday: "วันหยุดนักขัตฤกษ์",
+            exportBtn: "ดาวน์โหลด Excel", // ✅ Text ใหม่
             col: {
                 present: { label: "เข้า", tooltip: "เข้างาน" },
                 absent: { label: "ขาด", tooltip: "ขาดงาน" },
@@ -36,7 +33,6 @@ const AttendanceSheet = ({ session, lang }) => {
                 sick: { label: "ป่วย", tooltip: "ลาป่วย" },
                 other: { label: "อื่น", tooltip: "อื่นๆ" }
             },
-            // รหัสย่อในตาราง (S=Sick, P=Personal...)
             codes: { sick: 'ป', personal: 'ก', vacation: 'พ', maternity: 'ค', absent: 'ข', late: 'ส', halfDay: 'คร' }
         },
         EN: {
@@ -45,6 +41,7 @@ const AttendanceSheet = ({ session, lang }) => {
             summary: "Monthly Summary (Days)",
             legendWork: "Present (Check)",
             legendHoliday: "Public Holiday",
+            exportBtn: "Export Excel",
             col: {
                 present: { label: "P", tooltip: "Present" },
                 absent: { label: "A", tooltip: "Absent" },
@@ -61,6 +58,7 @@ const AttendanceSheet = ({ session, lang }) => {
             summary: "本月汇总 (天)",
             legendWork: "出勤 (勾选)",
             legendHoliday: "法定假日",
+            exportBtn: "导出 Excel",
             col: {
                 present: { label: "勤", tooltip: "出勤" },
                 absent: { label: "旷", tooltip: "旷工" },
@@ -76,6 +74,14 @@ const AttendanceSheet = ({ session, lang }) => {
     const t = texts[lang] || texts.TH;
 
     // --- Helper Functions ---
+    // ✅ แก้ไข: ใช้ Date Object ตรงๆ แล้ว format เอาเอง เพื่อแก้ Timezone
+    const formatDateKey = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     const getDaysInMonth = (date) => {
         const year = date.getFullYear();
         const month = date.getMonth();
@@ -84,8 +90,6 @@ const AttendanceSheet = ({ session, lang }) => {
     };
 
     const days = useMemo(() => getDaysInMonth(currentDate), [currentDate]);
-
-    const formatDateKey = (date) => date.toISOString().split('T')[0];
 
     // --- Fetch Data ---
     useEffect(() => {
@@ -138,26 +142,17 @@ const AttendanceSheet = ({ session, lang }) => {
 
     const getCellData = (empId, date) => {
         const dateStr = formatDateKey(date);
-
-        // เช็คการลา (Leave) ก่อน (ถ้าลา ห้ามติ๊ก)
+        // 1. เช็ควันลา (Leave) ก่อน
         const leaveRecord = leaves.find(l => l.emp_id === empId && l.date === dateStr);
-        if (leaveRecord) {
-            return {
-                type: 'leave',
-                leaveType: leaveRecord.type,
-                label: t.codes[leaveRecord.type] || 'L'
-            };
-        }
+        if (leaveRecord) return { type: 'leave', leaveType: leaveRecord.type };
 
-        // เช็คการมาทำงาน (Attendance)
+        // 2. เช็คการมาทำงาน (Attendance)
         const isPresent = attendanceLogs.some(a => a.emp_id === empId && a.date === dateStr);
 
-        // เช็ควันหยุด (Holiday)
-        if (holidays[dateStr]) {
-            return { type: 'holiday', isPresent, holidayName: holidays[dateStr] };
-        }
+        // 3. เช็ควันหยุด (Holiday)
+        if (holidays[dateStr]) return { type: 'holiday', isPresent, holidayName: holidays[dateStr] };
 
-        // วันธรรมดา
+        // 4. วันธรรมดา
         return { type: 'work', isPresent };
     };
 
@@ -177,114 +172,128 @@ const AttendanceSheet = ({ session, lang }) => {
         setCurrentDate(newDate);
     };
 
+    // ✅ ฟังก์ชัน Export Excel
+    const handleExportExcel = () => {
+        const fileName = `Attendance_${formatDateKey(currentDate).substring(0, 7)}.xlsx`;
+
+        // เตรียมข้อมูล Header
+        const header = [t.empName, t.col.present.label, t.col.absent.label, t.col.vacation.label, t.col.sick.label, t.col.personal.label, ...days.map(d => d.getDate())];
+
+        // เตรียมข้อมูล Rows
+        const body = employees.map(emp => {
+            const stats = calculateStats(emp.id);
+            const dailyData = days.map(d => {
+                const cell = getCellData(emp.id, d);
+                if (cell.type === 'leave') return t.codes[cell.leaveType] || 'L';
+                if (cell.type === 'holiday') return cell.isPresent ? '/' : 'H';
+                return cell.isPresent ? '/' : '';
+            });
+            return [emp.name, stats.present, stats.absent, stats.vacation, stats.sick, stats.personal, ...dailyData];
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+        XLSX.writeFile(wb, fileName);
+    };
+
+    if (isLoading) return (
+        <div className="d-flex justify-content-center align-items-center min-vh-100 bg-white">
+            <div className="loader-wrapper">
+                <div className="loader-circle"></div><div className="loader-circle"></div><div className="loader-circle"></div>
+                <div className="loader-shadow"></div><div className="loader-shadow"></div><div className="loader-shadow"></div>
+            </div>
+        </div>
+    );
+
     return (
         <div className="container-fluid py-4 bg-white">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <div className="d-flex align-items-center gap-3">
+            <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
+                <h4 className="fw-bold text-primary mb-0"></h4>
+
+                <div className="d-flex align-items-center gap-2">
                     <button className="btn btn-outline-secondary btn-sm" onClick={() => handleMonthChange(-1)}><i className="bi bi-chevron-left"></i></button>
-                    <span className="fw-bold fs-5">
+                    <span className="fw-bold fs-5 px-2">
                         {currentDate.toLocaleString(lang === 'TH' ? 'th-TH' : 'en-US', { month: 'long', year: 'numeric' })}
                     </span>
                     <button className="btn btn-outline-secondary btn-sm" onClick={() => handleMonthChange(1)}><i className="bi bi-chevron-right"></i></button>
+
+                    {/* ✅ ปุ่ม Export Excel */}
+                    <button className="btn btn-success btn-sm ms-3" onClick={handleExportExcel}>
+                        <i className="bi bi-file-earmark-excel me-1"></i> {t.exportBtn}
+                    </button>
                 </div>
             </div>
 
-            {isLoading ? <div className="d-flex justify-content-center align-items-center min-vh-100 bg-white">
-                <div className="loader-wrapper">
-                    <div className="loader-circle"></div>
-                    <div className="loader-circle"></div>
-                    <div className="loader-circle"></div>
-                    <div className="loader-shadow"></div>
-                    <div className="loader-shadow"></div>
-                    <div className="loader-shadow"></div>
-                </div>
-            </div> : (
-                <div className="table-responsive shadow-sm" style={{ borderRadius: '10px', overflow: 'hidden' }}>
-                    <table className="table table-bordered table-hover mb-0 text-center align-middle" style={{ fontSize: '0.85rem' }}>
-                        <thead className="bg-light text-secondary">
-                            <tr>
-                                <th rowSpan="2" className="align-middle bg-white sticky-col" style={{ minWidth: '150px', left: 0, zIndex: 10 }}>{t.empName}</th>
-                                <th colSpan="6" className="text-center">{t.summary}</th>
-                                {days.map(d => {
-                                    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                                    return <th key={d} className={`p-1 ${isWeekend ? 'bg-light text-danger' : ''}`} style={{ minWidth: '35px' }}>{d.getDate()}</th>;
-                                })}
-                            </tr>
-                            <tr>
-                                <th className="text-success" title={t.col.present.tooltip}><small>{t.col.present.label}</small></th>
-                                <th className="text-dark" title={t.col.absent.tooltip}><small>{t.col.absent.label}</small></th>
-                                <th className="text-success" title={t.col.vacation.tooltip}><small>{t.col.vacation.label}</small></th>
-                                <th className="text-warning" title={t.col.personal.tooltip}><small>{t.col.personal.label}</small></th>
-                                <th className="text-danger" title={t.col.sick.tooltip}><small>{t.col.sick.label}</small></th>
-                                <th className="text-secondary" title={t.col.other.tooltip}><small>{t.col.other.label}</small></th>
-
-                                {days.map(d => {
-                                    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                                    const dayName = d.toLocaleString(lang === 'TH' ? 'th-TH' : 'en-US', { weekday: 'short' });
-                                    return <th key={d} className={`p-0 ${isWeekend ? 'text-danger' : ''}`}><small>{dayName}</small></th>;
-                                })}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {employees.map(emp => {
-                                const stats = calculateStats(emp.id);
-                                return (
-                                    <tr key={emp.id}>
-                                        <td className="text-start fw-bold bg-white sticky-col" style={{ left: 0, zIndex: 5 }}>{emp.name}</td>
-                                        <td className="bg-success-subtle fw-bold">{stats.present}</td>
-                                        <td className="bg-secondary-subtle">{stats.absent}</td>
-                                        <td>{stats.vacation}</td>
-                                        <td>{stats.personal}</td>
-                                        <td>{stats.sick}</td>
-                                        <td>{stats.other}</td>
-                                        {days.map(d => {
-                                            const cell = getCellData(emp.id, d);
-                                            const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-
-                                            if (cell.type === 'leave') {
-                                                return (
-                                                    <td key={d} style={{ backgroundColor: leaveColors[cell.leaveType], color: 'white' }} title={cell.leaveType}>
-                                                        {cell.label}
-                                                    </td>
-                                                );
-                                            }
-
-                                            if (cell.type === 'holiday') {
-                                                return (
-                                                    <td key={d} className="bg-warning-subtle position-relative" title={`${t.legendHoliday}: ${cell.holidayName}`}>
-                                                        <i className="bi bi-star-fill text-warning position-absolute" style={{ fontSize: '0.6rem', top: '2px', right: '2px' }}></i>
-
-                                                        <input
-                                                            type="checkbox"
-                                                            className="form-check-input border-dark"
-                                                            style={{ cursor: 'pointer' }}
-                                                            checked={cell.isPresent}
-                                                            onChange={() => handleCheckAttendance(emp.id, d, cell.isPresent)}
-                                                        />
-                                                    </td>
-                                                );
-                                            }
-
-                                            return (
-                                                <td key={d} className={isWeekend ? 'bg-light' : ''}>
-                                                    <input
-                                                        type="checkbox"
-                                                        className="form-check-input border-dark"
-                                                        style={{ cursor: 'pointer' }}
-                                                        checked={cell.isPresent}
-                                                        onChange={() => handleCheckAttendance(emp.id, d, cell.isPresent)}
-                                                    />
-                                                </td>
-                                            );
-                                        })}
-                                    </tr>
-                                );
+            {/* ✅ Wrapper สำหรับ Scroll แนวนอน */}
+            <div className="table-responsive shadow-sm" style={{ borderRadius: '10px', overflowX: 'auto' }}>
+                <table className="table table-bordered table-hover mb-0 text-center align-middle" style={{ fontSize: '0.85rem', minWidth: '1000px' }}>
+                    <thead className="bg-light text-secondary">
+                        <tr>
+                            <th rowSpan="2" className="align-middle bg-white sticky-col" style={{ minWidth: '150px', left: 0, zIndex: 10, position: 'sticky' }}>{t.empName}</th>
+                            <th colSpan="6" className="text-center">{t.summary}</th>
+                            {days.map(d => {
+                                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                                return <th key={d} className={`p-1 ${isWeekend ? 'bg-light text-danger' : ''}`} style={{ minWidth: '35px' }}>{d.getDate()}</th>;
                             })}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+                        </tr>
+                        <tr>
+                            <th className="text-success" title={t.col.present.tooltip}><small>{t.col.present.label}</small></th>
+                            <th className="text-dark" title={t.col.absent.tooltip}><small>{t.col.absent.label}</small></th>
+                            <th className="text-success" title={t.col.vacation.tooltip}><small>{t.col.vacation.label}</small></th>
+                            <th className="text-warning" title={t.col.personal.tooltip}><small>{t.col.personal.label}</small></th>
+                            <th className="text-danger" title={t.col.sick.tooltip}><small>{t.col.sick.label}</small></th>
+                            <th className="text-secondary" title={t.col.other.tooltip}><small>{t.col.other.label}</small></th>
+                            {days.map(d => {
+                                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                                const dayName = d.toLocaleString(lang === 'TH' ? 'th-TH' : 'en-US', { weekday: 'short' });
+                                return <th key={d} className={`p-0 ${isWeekend ? 'text-danger' : ''}`}><small>{dayName}</small></th>;
+                            })}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {employees.map(emp => {
+                            const stats = calculateStats(emp.id);
+                            return (
+                                <tr key={emp.id}>
+                                    <td className="text-start fw-bold bg-white sticky-col" style={{ left: 0, zIndex: 5, position: 'sticky' }}>{emp.name}</td>
+                                    <td className="bg-success-subtle fw-bold">{stats.present}</td>
+                                    <td className="bg-secondary-subtle">{stats.absent}</td>
+                                    <td>{stats.vacation}</td>
+                                    <td>{stats.personal}</td>
+                                    <td>{stats.sick}</td>
+                                    <td>{stats.other}</td>
+                                    {days.map(d => {
+                                        const cell = getCellData(emp.id, d);
+                                        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
 
+                                        if (cell.type === 'leave') return (
+                                            <td key={d} style={{ backgroundColor: leaveColors[cell.leaveType], color: 'white' }} title={cell.leaveType}>
+                                                {t.codes[cell.leaveType] || 'L'}
+                                            </td>
+                                        );
+
+                                        if (cell.type === 'holiday') return (
+                                            <td key={d} className="bg-warning-subtle position-relative" title={`${t.legendHoliday}: ${cell.holidayName}`}>
+                                                <i className="bi bi-star-fill text-warning position-absolute" style={{ fontSize: '0.6rem', top: '2px', right: '2px' }}></i>
+                                                <input type="checkbox" className="form-check-input border-dark" style={{ cursor: 'pointer' }} checked={cell.isPresent} onChange={() => handleCheckAttendance(emp.id, d, cell.isPresent)} />
+                                            </td>
+                                        );
+
+                                        return (
+                                            <td key={d} className={isWeekend ? 'bg-light' : ''}>
+                                                <input type="checkbox" className="form-check-input border-dark" style={{ cursor: 'pointer' }} checked={cell.isPresent} onChange={() => handleCheckAttendance(emp.id, d, cell.isPresent)} />
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Legend */}
             <div className="mt-3 d-flex flex-wrap gap-3 small">
                 <span className="d-flex align-items-center gap-1"><div style={{ width: 15, height: 15, border: '1px solid #333', borderRadius: 3 }}></div> {t.legendWork}</span>
                 <span className="d-flex align-items-center gap-1"><div style={{ width: 15, height: 15, background: leaveColors.sick }}></div> {t.codes.sick}={t.col.sick.tooltip}</span>
