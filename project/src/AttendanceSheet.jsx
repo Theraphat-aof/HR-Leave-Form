@@ -151,44 +151,29 @@ const AttendanceSheet = ({ session, lang }) => {
         }
 
         try {
-            let error;
             if (!currentStatus) {
-                // บันทึกการมาทำงาน
-                // เพิ่ม .select() เพื่อตรวจสอบว่าการ Upsert สำเร็จจริงหรือไม่ (ป้องกันเคส 200 OK แต่ไม่ Update)
-                const { data, error: upsertError } = await supabase
-                    .from('attendance_logs')
-                    .upsert(
-                        { emp_id: empId, date: dateStr, is_present: true }, 
-                        { onConflict: 'emp_id, date' }
-                    )
-                    .select();
+                // ✅ Logic ใหม่ Force Write: ลบของเก่าทิ้งก่อนเสมอ แล้ว Insert ใหม่
+                // เพื่อแก้ปัญหา Upsert ได้ 200 OK แต่ไม่บันทึกจริง (กรณีติด RLS หรือ Ghost Record)
                 
-                error = upsertError;
+                // 1. Attempt Delete existing records
+                await supabase.from('attendance_logs').delete().eq('emp_id', empId).eq('date', dateStr);
+                
+                // 2. Insert new record
+                const { error: insertError } = await supabase
+                    .from('attendance_logs')
+                    .insert({ emp_id: empId, date: dateStr, is_present: true });
+                
+                if (insertError) throw insertError;
 
-                // Hack: ถ้า Upsert ตอบกลับ 200/201 แต่ไม่มี Data กลับมา แสดงว่าติด RLS หรือ Update ไม่สำเร็จ
-                if (!error && (!data || data.length === 0)) {
-                    console.warn("Update returned no data. Attempting force re-insert...", { empId, dateStr });
-                    
-                    // ลองลบของเก่าทิ้งก่อน (ถ้ามี)
-                    await supabase.from('attendance_logs').delete().eq('emp_id', empId).eq('date', dateStr);
-                    
-                    // ลอง Insert ใหม่
-                    const { error: retryError } = await supabase
-                        .from('attendance_logs')
-                        .insert({ emp_id: empId, date: dateStr, is_present: true });
-                    
-                    error = retryError;
-                }
             } else {
                 const { error: deleteError } = await supabase
                     .from('attendance_logs')
                     .delete()
                     .eq('emp_id', empId)
                     .eq('date', dateStr);
-                error = deleteError;
+                
+                if (deleteError) throw deleteError;
             }
-
-            if (error) throw error;
 
         } catch (error) { 
             console.error("Error updating attendance:", error);
