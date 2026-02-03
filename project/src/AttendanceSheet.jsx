@@ -118,7 +118,6 @@ const AttendanceSheet = ({ session, lang }) => {
                 const startStr = formatDateKey(days[0]);
                 const endStr = formatDateKey(days[days.length - 1]);
 
-                console.log(`[Fetch] Loading data for range: ${startStr} to ${endStr}`);
 
                 const { data: leaveData } = await supabase.from('leave_records').select('*').gte('date', startStr).lte('date', endStr).limit(5000);
                 setLeaves(leaveData || []);
@@ -155,11 +154,6 @@ const AttendanceSheet = ({ session, lang }) => {
                     }
                     // Safety break ข้อมูลเยอะเกินไป (ป้องกัน Infinite Loop กรณีผิดพลาด)
                     if (allAttLogs.length > 20000) break;
-                }
-
-                console.log(`[Fetch Success] Total loaded: ${allAttLogs.length} records`);
-                if (allAttLogs.length > 0) {
-                    console.log("Sample Record (Raw):", JSON.stringify(allAttLogs[0]));
                 }
 
                 // ✅ Normalize Data loop
@@ -199,7 +193,6 @@ const AttendanceSheet = ({ session, lang }) => {
         }
 
         const dateStr = formatDateKey(date);
-        console.log(`[Action] Processing: Emp=${empId}, Date=${dateStr}, CurrentStatus=${currentStatus}`);
 
         // Optimistic Update
         if (!currentStatus) {
@@ -224,7 +217,6 @@ const AttendanceSheet = ({ session, lang }) => {
                 
                 if (insertError) throw insertError;
 
-                console.log("[Insert Result]", insertedData);
 
                 // ตรวจสอบว่า Insert แล้วอ่านคืนได้หรือไม่?
                 if (!insertedData || insertedData.length === 0) {
@@ -241,7 +233,6 @@ const AttendanceSheet = ({ session, lang }) => {
                     .eq('date', dateStr);
                 
                 if (deleteError) throw deleteError;
-                console.log("[Delete Result] Success");
             }
 
         } catch (error) { 
