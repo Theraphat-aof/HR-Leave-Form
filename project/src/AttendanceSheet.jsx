@@ -153,10 +153,11 @@ const AttendanceSheet = ({ session, lang }) => {
         try {
             let error;
             if (!currentStatus) {
+                // บันทึกการมาทำงาน (ตัด org_id ออกเนื่องจาก Database ไม่มี column คอลัมน์นี้)
                 const { error: upsertError } = await supabase
                     .from('attendance_logs')
                     .upsert(
-                        { emp_id: empId, date: dateStr, is_present: true, org_id: orgId }, 
+                        { emp_id: empId, date: dateStr, is_present: true }, 
                         { onConflict: 'emp_id, date' }
                     );
                 error = upsertError;
