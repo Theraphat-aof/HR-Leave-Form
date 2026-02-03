@@ -12,10 +12,15 @@ const AttendanceSheet = ({ session, lang }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [orgId, setOrgId] = useState(null);
 
-    // --- Configuration ---
+    // --- Configuration: Texts & Colors ---
     const leaveColors = {
-        sick: '#dc3545', personal: '#ffc107', vacation: '#198754',
-        maternity: '#0d6efd', absent: '#212529', late: '#fd7e14', halfDay: '#6f42c1'
+        sick: '#dc3545', 
+        personal: '#ffc107', 
+        vacation: '#198754',
+        maternity: '#0d6efd', 
+        absent: '#212529', 
+        late: '#fd7e14', 
+        halfDay: '#6f42c1'
     };
 
     const texts = {
@@ -27,12 +32,14 @@ const AttendanceSheet = ({ session, lang }) => {
             legendHoliday: "วันหยุดนักขัตฤกษ์",
             exportBtn: "ดาวน์โหลด Excel",
             col: {
-                present: { label: "เข้า", tooltip: "เข้างาน" },
+                present: { label: "เข้า", tooltip: "เข้างาน (รวมลาครึ่งวัน)" }, // ✅ อัปเดต Tooltip
                 absent: { label: "ขาด", tooltip: "ขาดงาน" },
                 vacation: { label: "พัก", tooltip: "ลาพักร้อน" },
                 personal: { label: "กิจ", tooltip: "ลากิจ" },
                 sick: { label: "ป่วย", tooltip: "ลาป่วย" },
-                other: { label: "อื่น", tooltip: "อื่นๆ" }
+                late: { label: "สาย", tooltip: "มาสาย" },         // ✅ เพิ่ม
+                maternity: { label: "คลอด", tooltip: "ลาคลอด" },   // ✅ เพิ่ม
+                halfDay: { label: "ครึ่ง", tooltip: "ลาครึ่งวัน" }  // ✅ เพิ่ม
             },
             codes: { sick: 'ป', personal: 'ก', vacation: 'พ', maternity: 'ค', absent: 'ข', late: 'ส', halfDay: 'คร' }
         },
@@ -44,12 +51,14 @@ const AttendanceSheet = ({ session, lang }) => {
             legendHoliday: "Public Holiday",
             exportBtn: "Export Excel",
             col: {
-                present: { label: "P", tooltip: "Present" },
+                present: { label: "P", tooltip: "Present (Inc. Half-Day)" },
                 absent: { label: "A", tooltip: "Absent" },
                 vacation: { label: "V", tooltip: "Vacation" },
                 personal: { label: "L", tooltip: "Personal Leave" },
                 sick: { label: "S", tooltip: "Sick Leave" },
-                other: { label: "O", tooltip: "Other" }
+                late: { label: "Lt", tooltip: "Late" },
+                maternity: { label: "M", tooltip: "Maternity" },
+                halfDay: { label: "HD", tooltip: "Half-Day" }
             },
             codes: { sick: 'S', personal: 'P', vacation: 'V', maternity: 'M', absent: 'A', late: 'L', halfDay: 'HD' }
         },
@@ -61,12 +70,14 @@ const AttendanceSheet = ({ session, lang }) => {
             legendHoliday: "法定假日",
             exportBtn: "导出 Excel",
             col: {
-                present: { label: "勤", tooltip: "出勤" },
+                present: { label: "勤", tooltip: "出勤 (含半天)" },
                 absent: { label: "旷", tooltip: "旷工" },
                 vacation: { label: "休", tooltip: "年假" },
                 personal: { label: "事", tooltip: "事假" },
                 sick: { label: "病", tooltip: "病假" },
-                other: { label: "其", tooltip: "其他" }
+                late: { label: "迟", tooltip: "迟到" },
+                maternity: { label: "产", tooltip: "产假" },
+                halfDay: { label: "半", tooltip: "半天假" }
             },
             codes: { sick: '病', personal: '事', vacation: '休', maternity: '产', absent: '旷', late: '迟', halfDay: '半' }
         }
@@ -153,13 +164,37 @@ const AttendanceSheet = ({ session, lang }) => {
         return { type: 'work', isPresent };
     };
 
+    // ✅ ปรับปรุง Logic คำนวณยอด
     const calculateStats = (empId) => {
-        let stats = { present: 0, sick: 0, personal: 0, vacation: 0, absent: 0, other: 0 };
+        // 1. ตั้งค่าเริ่มต้นให้ครบทุกประเภท (ไม่ต้องมี Other แล้ว)
+        let stats = { 
+            present: 0, 
+            sick: 0, 
+            personal: 0, 
+            vacation: 0, 
+            absent: 0, 
+            late: 0, 
+            maternity: 0, 
+            halfDay: 0 
+        };
+
+        // 2. นับวันมาทำงาน (ติ๊กถูก)
         stats.present = attendanceLogs.filter(a => a.emp_id === empId).length;
+
+        // 3. นับวันลาประเภทต่างๆ
         leaves.filter(l => l.emp_id === empId).forEach(l => {
-            if (stats[l.type] !== undefined) stats[l.type] += (Number(l.days) || 1);
-            else stats.other += (Number(l.days) || 1);
+            const daysCount = Number(l.days) || 1;
+
+            if (stats[l.type] !== undefined) {
+                stats[l.type] += daysCount;
+            }
+
+            // ✅ Logic พิเศษ: ถ้าเป็น "ลาครึ่งวัน" (halfDay) ให้บวก 0.5 เข้าไปใน "ยอดเข้างาน" (present) ด้วย
+            if (l.type === 'halfDay') {
+                stats.present += 0.5;
+            }
         });
+
         return stats;
     };
 
@@ -169,11 +204,22 @@ const AttendanceSheet = ({ session, lang }) => {
         setCurrentDate(newDate);
     };
 
-    // ฟังก์ชัน Export Excel
     const handleExportExcel = () => {
         const fileName = `Attendance_${formatDateKey(currentDate).substring(0, 7)}.xlsx`;
 
-        const header = [t.empName, t.col.present.label, t.col.absent.label, t.col.vacation.label, t.col.sick.label, t.col.personal.label, ...days.map(d => d.getDate())];
+        // ✅ แก้ไข Header Excel ให้ตรงกับตารางใหม่
+        const header = [
+            t.empName, 
+            t.col.present.label, 
+            t.col.absent.label, 
+            t.col.vacation.label, 
+            t.col.personal.label, 
+            t.col.sick.label,
+            t.col.late.label,      // เพิ่ม
+            t.col.maternity.label, // เพิ่ม
+            t.col.halfDay.label,   // เพิ่ม
+            ...days.map(d => d.getDate())
+        ];
 
         const body = employees.map(emp => {
             const stats = calculateStats(emp.id);
@@ -183,7 +229,19 @@ const AttendanceSheet = ({ session, lang }) => {
                 if (cell.type === 'holiday') return cell.isPresent ? '/' : 'H';
                 return cell.isPresent ? '/' : '';
             });
-            return [emp.name, stats.present, stats.absent, stats.vacation, stats.sick, stats.personal, ...dailyData];
+            // ✅ แก้ไขข้อมูล Row ให้ตรง Header
+            return [
+                emp.name, 
+                stats.present, 
+                stats.absent, 
+                stats.vacation, 
+                stats.personal, 
+                stats.sick, 
+                stats.late, 
+                stats.maternity, 
+                stats.halfDay, 
+                ...dailyData
+            ];
         });
 
         const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
@@ -213,32 +271,39 @@ const AttendanceSheet = ({ session, lang }) => {
                     </span>
                     <button className="btn btn-outline-secondary btn-sm" onClick={() => handleMonthChange(1)}><i className="bi bi-chevron-right"></i></button>
 
-                    {/* ✅ ปุ่ม Export Excel */}
                     <button className="btn btn-success btn-sm ms-3" onClick={handleExportExcel}>
                         <i className="bi bi-file-earmark-excel me-1"></i> {t.exportBtn}
                     </button>
                 </div>
             </div>
 
-            {/* ✅ Wrapper สำหรับ Scroll แนวนอน */}
             <div className="table-responsive shadow-sm" style={{ borderRadius: '10px', overflowX: 'auto' }}>
-                <table className="table table-bordered table-hover mb-0 text-center align-middle" style={{ fontSize: '0.85rem', minWidth: '1000px' }}>
+                <table className="table table-bordered table-hover mb-0 text-center align-middle" style={{ fontSize: '0.85rem', minWidth: '1200px' }}>
                     <thead className="bg-light text-secondary">
                         <tr>
                             <th rowSpan="2" className="align-middle bg-white sticky-col" style={{ minWidth: '150px', left: 0, zIndex: 10, position: 'sticky' }}>{t.empName}</th>
-                            <th colSpan="6" className="text-center">{t.summary}</th>
+                            
+                            {/* ✅ ขยาย colSpan เป็น 8 ช่อง (เพราะเพิ่มประเภทลา) */}
+                            <th colSpan="8" className="text-center">{t.summary}</th>
+                            
                             {days.map(d => {
                                 const isWeekend = d.getDay() === 0 || d.getDay() === 6;
                                 return <th key={d} className={`p-1 ${isWeekend ? 'bg-light text-danger' : ''}`} style={{ minWidth: '35px' }}>{d.getDate()}</th>;
                             })}
                         </tr>
                         <tr>
+                            {/* ✅ ปรับปรุง Header Columns (เอา Other ออก, เพิ่ม Late, Maternity, HalfDay) */}
                             <th className="text-success" title={t.col.present.tooltip}><small>{t.col.present.label}</small></th>
                             <th className="text-dark" title={t.col.absent.tooltip}><small>{t.col.absent.label}</small></th>
                             <th className="text-success" title={t.col.vacation.tooltip}><small>{t.col.vacation.label}</small></th>
                             <th className="text-warning" title={t.col.personal.tooltip}><small>{t.col.personal.label}</small></th>
                             <th className="text-danger" title={t.col.sick.tooltip}><small>{t.col.sick.label}</small></th>
-                            <th className="text-secondary" title={t.col.other.tooltip}><small>{t.col.other.label}</small></th>
+                            
+                            {/* Columns ใหม่ */}
+                            <th className="text-warning" style={{color: '#fd7e14'}} title={t.col.late.tooltip}><small>{t.col.late.label}</small></th>
+                            <th className="text-primary" title={t.col.maternity.tooltip}><small>{t.col.maternity.label}</small></th>
+                            <th className="text-info" style={{color: '#6f42c1'}} title={t.col.halfDay.tooltip}><small>{t.col.halfDay.label}</small></th>
+
                             {days.map(d => {
                                 const isWeekend = d.getDay() === 0 || d.getDay() === 6;
                                 const dayName = d.toLocaleString(lang === 'TH' ? 'th-TH' : 'en-US', { weekday: 'short' });
@@ -252,12 +317,17 @@ const AttendanceSheet = ({ session, lang }) => {
                             return (
                                 <tr key={emp.id}>
                                     <td className="text-start fw-bold bg-white sticky-col" style={{ left: 0, zIndex: 5, position: 'sticky' }}>{emp.name}</td>
+                                    
+                                    {/* ✅ แสดงผลข้อมูลตามช่องใหม่ */}
                                     <td className="bg-success-subtle fw-bold">{stats.present}</td>
                                     <td className="bg-secondary-subtle">{stats.absent}</td>
                                     <td>{stats.vacation}</td>
                                     <td>{stats.personal}</td>
                                     <td>{stats.sick}</td>
-                                    <td>{stats.other}</td>
+                                    <td>{stats.late}</td>
+                                    <td>{stats.maternity}</td>
+                                    <td>{stats.halfDay}</td>
+
                                     {days.map(d => {
                                         const cell = getCellData(emp.id, d);
                                         const isWeekend = d.getDay() === 0 || d.getDay() === 6;
@@ -288,7 +358,6 @@ const AttendanceSheet = ({ session, lang }) => {
                 </table>
             </div>
 
-            {/* Legend */}
             <div className="mt-3 d-flex flex-wrap gap-3 small">
                 <span className="d-flex align-items-center gap-1"><div style={{ width: 15, height: 15, border: '1px solid #333', borderRadius: 3 }}></div> {t.legendWork}</span>
                 <span className="d-flex align-items-center gap-1"><div style={{ width: 15, height: 15, background: leaveColors.sick }}></div> {t.codes.sick}={t.col.sick.tooltip}</span>
