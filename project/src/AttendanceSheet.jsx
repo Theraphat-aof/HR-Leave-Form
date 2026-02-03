@@ -118,11 +118,68 @@ const AttendanceSheet = ({ session, lang }) => {
                 const startStr = formatDateKey(days[0]);
                 const endStr = formatDateKey(days[days.length - 1]);
 
-                const { data: leaveData } = await supabase.from('leave_records').select('*').gte('date', startStr).lte('date', endStr);
+                console.log(`[Fetch] Loading data for range: ${startStr} to ${endStr}`);
+
+                const { data: leaveData } = await supabase.from('leave_records').select('*').gte('date', startStr).lte('date', endStr).limit(5000);
                 setLeaves(leaveData || []);
 
-                const { data: attData } = await supabase.from('attendance_logs').select('*').gte('date', startStr).lte('date', endStr).eq('is_present', true);
-                setAttendanceLogs(attData || []);
+                // ✅ Pagination Logic: Fetch until all data is loaded
+                let allAttLogs = [];
+                let hasMore = true;
+                let from = 0;
+                const pageSize = 1000;
+
+                while (hasMore) {
+                    const { data: pageData, error: pageError } = await supabase
+                        .from('attendance_logs')
+                        .select('*')
+                        .gte('date', startStr)
+                        .lte('date', endStr)
+                        .eq('is_present', true)
+                        .range(from, from + pageSize - 1);
+                    
+                    if (pageError) {
+                        console.error("[Fetch Error] Attendance Page:", pageError);
+                        break;
+                    }
+
+                    if (pageData && pageData.length > 0) {
+                        allAttLogs = [...allAttLogs, ...pageData];
+                        if (pageData.length < pageSize) {
+                            hasMore = false; // ถ้าข้อมูลน้อยกว่า page size แปลว่าหมดแล้ว
+                        } else {
+                            from += pageSize; // ขยับหน้าถัดไป
+                        }
+                    } else {
+                        hasMore = false;
+                    }
+                    // Safety break ข้อมูลเยอะเกินไป (ป้องกัน Infinite Loop กรณีผิดพลาด)
+                    if (allAttLogs.length > 20000) break;
+                }
+
+                console.log(`[Fetch Success] Total loaded: ${allAttLogs.length} records`);
+                if (allAttLogs.length > 0) {
+                    console.log("Sample Record (Raw):", JSON.stringify(allAttLogs[0]));
+                }
+
+                // ✅ Normalize Data loop
+                const normalizeDate = (isoString) => {
+                    if (!isoString) return "";
+                    let result;
+                    if (isoString.indexOf('T') === -1) {
+                        result = isoString;
+                    } else {
+                        const d = new Date(isoString);
+                        result = formatDateKey(d);
+                    }
+                    return result;
+                };
+
+                const normalizedLeaves = (leaveData || []).map(l => ({ ...l, date: normalizeDate(l.date) }));
+                const normalizedLogs = allAttLogs.map(a => ({ ...a, date: normalizeDate(a.date) }));
+
+                setLeaves(normalizedLeaves);
+                setAttendanceLogs(normalizedLogs);
 
                 const { data: hData } = await supabase.from('holidays').select('*');
                 const hMap = {};
@@ -142,7 +199,8 @@ const AttendanceSheet = ({ session, lang }) => {
         }
 
         const dateStr = formatDateKey(date);
-        
+        console.log(`[Action] Processing: Emp=${empId}, Date=${dateStr}, CurrentStatus=${currentStatus}`);
+
         // Optimistic Update
         if (!currentStatus) {
             setAttendanceLogs(prev => [...prev, { emp_id: empId, date: dateStr, is_present: true }]);
@@ -152,20 +210,30 @@ const AttendanceSheet = ({ session, lang }) => {
 
         try {
             if (!currentStatus) {
-                // ✅ Logic ใหม่ Force Write: ลบของเก่าทิ้งก่อนเสมอ แล้ว Insert ใหม่
-                // เพื่อแก้ปัญหา Upsert ได้ 200 OK แต่ไม่บันทึกจริง (กรณีติด RLS หรือ Ghost Record)
-                
-                // 1. Attempt Delete existing records
-                await supabase.from('attendance_logs').delete().eq('emp_id', empId).eq('date', dateStr);
-                
-                // 2. Insert new record
-                const { error: insertError } = await supabase
+                // CASE: ต้องการ Check (บันทึกมาทำงาน)
+
+                // 1. ลบข้อมูลเก่าก่อนเสมอ (Cleanup Ghost Records)
+                const { error: delError } = await supabase.from('attendance_logs').delete().eq('emp_id', empId).eq('date', dateStr);
+                if (delError) console.warn("Delete Error:", delError);
+
+                // 2. Insert ข้อมูลใหม่ + .select() เพื่อดูว่าข้อมูลถูกเขียนจริงไหม
+                const { data: insertedData, error: insertError } = await supabase
                     .from('attendance_logs')
-                    .insert({ emp_id: empId, date: dateStr, is_present: true });
+                    .insert({ emp_id: empId, date: dateStr, is_present: true })
+                    .select();
                 
                 if (insertError) throw insertError;
 
+                console.log("[Insert Result]", insertedData);
+
+                // ตรวจสอบว่า Insert แล้วอ่านคืนได้หรือไม่?
+                if (!insertedData || insertedData.length === 0) {
+                    console.error("CRITICAL: Insert returned success (201) but NO DATA. RLS Policy might be blocking read access.");
+                    alert(`บันทึกสำเร็จแต่ตรวจสอบข้อมูลไม่ได้ (อาจเป็นที่สิทธิ์การเข้าถึง) - กรุณารีเฟรชเพื่อดูผลลัพธ์จริง`);
+                }
+
             } else {
+                // CASE: ต้องการ Uncheck (ลบการมาทำงาน)
                 const { error: deleteError } = await supabase
                     .from('attendance_logs')
                     .delete()
@@ -173,6 +241,7 @@ const AttendanceSheet = ({ session, lang }) => {
                     .eq('date', dateStr);
                 
                 if (deleteError) throw deleteError;
+                console.log("[Delete Result] Success");
             }
 
         } catch (error) { 
@@ -190,10 +259,11 @@ const AttendanceSheet = ({ session, lang }) => {
 
     const getCellData = (empId, date) => {
         const dateStr = formatDateKey(date);
-        const leaveRecord = leaves.find(l => l.emp_id === empId && l.date === dateStr);
+        const leaveRecord = leaves.find(l => l.emp_id == empId && l.date === dateStr);
         if (leaveRecord) return { type: 'leave', leaveType: leaveRecord.type };
 
-        const isPresent = attendanceLogs.some(a => a.emp_id === empId && a.date === dateStr);
+        // ใช้ == เผื่อกรณี type mismatch (string vs number)
+        const isPresent = attendanceLogs.some(a => a.emp_id == empId && a.date === dateStr);
 
         if (holidays[dateStr]) return { type: 'holiday', isPresent, holidayName: holidays[dateStr] };
 
@@ -202,7 +272,7 @@ const AttendanceSheet = ({ session, lang }) => {
 
     // ✅ ปรับปรุง Logic คำนวณยอด
     const calculateStats = (empId) => {
-        // 1. ตั้งค่าเริ่มต้นให้ครบทุกประเภท (ไม่ต้องมี Other แล้ว)
+        // 1. ตั้งค่าเริ่มต้น
         let stats = { 
             present: 0, 
             sick: 0, 
@@ -214,21 +284,35 @@ const AttendanceSheet = ({ session, lang }) => {
             halfDay: 0 
         };
 
-        // 2. นับวันมาทำงาน (ติ๊กถูก)
-        stats.present = attendanceLogs.filter(a => a.emp_id === empId).length;
+        const empLeaves = leaves.filter(l => l.emp_id == empId);
 
-        // 3. นับวันลาประเภทต่างๆ
-        leaves.filter(l => l.emp_id === empId).forEach(l => {
+        // 2. นับวันลาลง Stats
+        empLeaves.forEach(l => {
             const daysCount = Number(l.days) || 1;
-
             if (stats[l.type] !== undefined) {
                 stats[l.type] += daysCount;
             }
+        });
 
-            // ✅ Logic พิเศษ: ถ้าเป็น "ลาครึ่งวัน" (halfDay) ให้บวก 0.5 เข้าไปใน "ยอดเข้างาน" (present) ด้วย
-            if (l.type === 'halfDay') {
-                stats.present += 0.5;
+        // 3. นับวันมาทำงานจากการติ๊ก (Attendance Logs)
+        // **สำคัญ:** ถ้าวันนั้นมี Record การลาอยู่แล้ว (ไม่ว่าประเภทไหน) ให้ตัดการติ๊กทิ้ง (ยึดตามใบลา)
+        // เพื่อป้องกันการนับซ้ำ หรือนับผิดกรณี ลาป่วย แต่มี Ghost Check ค้างอยู่
+        const validChecks = attendanceLogs.filter(a => {
+            if (a.emp_id != empId) return false;
+            const hasLeave = empLeaves.some(l => l.date === a.date);
+            return !hasLeave; // นับเฉพาะวันที่ "ไม่มีการลา"
+        });
+
+        stats.present = validChecks.length;
+
+        // 4. บวกยอดเข้างานคืนให้ สำหรับประเภทที่ถือว่า "มาทำงาน"
+        empLeaves.forEach(l => {
+            if (l.type === 'late') {
+                stats.present += 1;   // สาย = มาทำงานเต็มวัน
+            } else if (l.type === 'halfDay') {
+                stats.present += 0.5; // ลาครึ่งวัน = มาทำงาน 0.5 วัน
             }
+            // ส่วน sick, personal, vacation, maternity, absent ไม่มีการบวกเพิ่ม (เท่ากับไม่ได้มาทำงาน)
         });
 
         return stats;
