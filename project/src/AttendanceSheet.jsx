@@ -136,7 +136,14 @@ const AttendanceSheet = ({ session, lang }) => {
 
     // --- Actions ---
     const handleCheckAttendance = async (empId, date, currentStatus) => {
+        if (!orgId) {
+            alert("Organization ID not found. Please refresh the page.");
+            return;
+        }
+
         const dateStr = formatDateKey(date);
+        
+        // Optimistic Update
         if (!currentStatus) {
             setAttendanceLogs(prev => [...prev, { emp_id: empId, date: dateStr, is_present: true }]);
         } else {
@@ -144,12 +151,37 @@ const AttendanceSheet = ({ session, lang }) => {
         }
 
         try {
+            let error;
             if (!currentStatus) {
-                await supabase.from('attendance_logs').upsert({ emp_id: empId, date: dateStr, is_present: true, org_id: orgId }, { onConflict: 'emp_id, date' });
+                const { error: upsertError } = await supabase
+                    .from('attendance_logs')
+                    .upsert(
+                        { emp_id: empId, date: dateStr, is_present: true, org_id: orgId }, 
+                        { onConflict: 'emp_id, date' }
+                    );
+                error = upsertError;
             } else {
-                await supabase.from('attendance_logs').delete().match({ emp_id: empId, date: dateStr });
+                const { error: deleteError } = await supabase
+                    .from('attendance_logs')
+                    .delete()
+                    .eq('emp_id', empId)
+                    .eq('date', dateStr);
+                error = deleteError;
             }
-        } catch (error) { alert("Error: " + error.message); }
+
+            if (error) throw error;
+
+        } catch (error) { 
+            console.error("Error updating attendance:", error);
+            alert("บันทึกไม่สำเร็จ: " + (error.message || "Unknown error"));
+            
+            // Revert state if failed
+            if (!currentStatus) {
+                setAttendanceLogs(prev => prev.filter(r => !(r.emp_id === empId && r.date === dateStr)));
+            } else {
+                setAttendanceLogs(prev => [...prev, { emp_id: empId, date: dateStr, is_present: true }]);
+            }
+        }
     };
 
     const getCellData = (empId, date) => {
