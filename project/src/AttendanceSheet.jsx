@@ -153,14 +153,32 @@ const AttendanceSheet = ({ session, lang }) => {
         try {
             let error;
             if (!currentStatus) {
-                // บันทึกการมาทำงาน (ตัด org_id ออกเนื่องจาก Database ไม่มี column คอลัมน์นี้)
-                const { error: upsertError } = await supabase
+                // บันทึกการมาทำงาน
+                // เพิ่ม .select() เพื่อตรวจสอบว่าการ Upsert สำเร็จจริงหรือไม่ (ป้องกันเคส 200 OK แต่ไม่ Update)
+                const { data, error: upsertError } = await supabase
                     .from('attendance_logs')
                     .upsert(
                         { emp_id: empId, date: dateStr, is_present: true }, 
                         { onConflict: 'emp_id, date' }
-                    );
+                    )
+                    .select();
+                
                 error = upsertError;
+
+                // Hack: ถ้า Upsert ตอบกลับ 200/201 แต่ไม่มี Data กลับมา แสดงว่าติด RLS หรือ Update ไม่สำเร็จ
+                if (!error && (!data || data.length === 0)) {
+                    console.warn("Update returned no data. Attempting force re-insert...", { empId, dateStr });
+                    
+                    // ลองลบของเก่าทิ้งก่อน (ถ้ามี)
+                    await supabase.from('attendance_logs').delete().eq('emp_id', empId).eq('date', dateStr);
+                    
+                    // ลอง Insert ใหม่
+                    const { error: retryError } = await supabase
+                        .from('attendance_logs')
+                        .insert({ emp_id: empId, date: dateStr, is_present: true });
+                    
+                    error = retryError;
+                }
             } else {
                 const { error: deleteError } = await supabase
                     .from('attendance_logs')
