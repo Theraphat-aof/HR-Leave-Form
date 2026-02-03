@@ -10,6 +10,7 @@ const AttendanceSheet = ({ session, lang }) => {
     const [attendanceLogs, setAttendanceLogs] = useState([]);
     const [holidays, setHolidays] = useState({});
     const [isLoading, setIsLoading] = useState(false);
+    const [orgId, setOrgId] = useState(null);
 
     // --- Configuration ---
     const leaveColors = {
@@ -98,6 +99,7 @@ const AttendanceSheet = ({ session, lang }) => {
             try {
                 const { data: profile } = await supabase.from('user_profiles').select('org_id').eq('user_id', session.user.id).single();
                 if (!profile) throw new Error("No Org Found");
+                setOrgId(profile.org_id);
 
                 const { data: empData } = await supabase.from('employees').select('*').eq('org_id', profile.org_id).order('id');
                 setEmployees(empData || []);
@@ -132,7 +134,7 @@ const AttendanceSheet = ({ session, lang }) => {
 
         try {
             if (!currentStatus) {
-                await supabase.from('attendance_logs').upsert({ emp_id: empId, date: dateStr, is_present: true }, { onConflict: 'emp_id, date' });
+                await supabase.from('attendance_logs').upsert({ emp_id: empId, date: dateStr, is_present: true, org_id: orgId }, { onConflict: 'emp_id, date' });
             } else {
                 await supabase.from('attendance_logs').delete().match({ emp_id: empId, date: dateStr });
             }
